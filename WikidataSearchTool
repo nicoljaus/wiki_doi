@@ -1,0 +1,46 @@
+import requests
+
+def search_wikidata(contributor_name, orcid_id=None):
+    """Ищет Wikidata ID по имени и фамилии или по ORCID iD."""
+    
+    # Если передан ORCID iD, сначала проверяем его
+    if orcid_id:
+        sparql_query = f"""
+        SELECT ?item WHERE {{
+            ?item wdt:P496 "{orcid_id}" .
+        }}
+        """
+        url = "https://query.wikidata.org/sparql"
+        headers = {
+            'User -Agent': 'MyWikidataApp/1.0 (https://github.com/nicoljaus/wiki_doi)'
+        }
+        response = requests.get(url, params={'query': sparql_query, 'format': 'json'}, headers=headers)
+
+        if response.status_code == 200:
+            data = response.json()
+            if data['results']['bindings']:
+                return data['results']['bindings'][0]['item']['value'].split('/')[-1]  # Возвращаем ID элемента
+
+    # Если ORCID не найден, продолжаем искать по имени
+    queries = [
+        contributor_name,  # "имя фамилия"
+        ' '.join(reversed(contributor_name.split()))  # "фамилия имя"
+    ]
+    
+    for query in queries:
+        search_url = f"https://www.wikidata.org/w/api.php?action=wbsearchentities&search={query}&language=en&format=json"
+        response = requests.get(search_url)
+
+        if response.status_code == 200:
+            data = response.json()
+            if 'search' in data and data['search']:
+                return data['search'][0]['id']  # Возвращаем первый найденный ID
+            else:
+                print(f"Wikidata ID не найден для: {query}")
+        else:
+            print(f"Ошибка при запросе к Викиданным: {response.status_code}")
+
+    return ''  # Если ID не найден
+
+wikidata_id = search_wikidata ('A.A. Kanapin', '0000-0001-9802-5297')
+wikidata_id
